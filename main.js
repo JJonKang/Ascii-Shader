@@ -33,6 +33,14 @@ function createShader(gl, type, source){
 };
 
 /////////////////////////////////////////////////////
+// Shape
+function preAscii(char, dimW, dimH, circles) {
+  const offscreen = document.createElement('canvas');
+  //offscreen.width = 
+}
+
+
+/////////////////////////////////////////////////////
 // Initialization and Rendering
 function initialize(){
   // screen setup
@@ -69,6 +77,27 @@ function initialize(){
   observer.observe(canvas);
   const uTime = gl.getUniformLocation(program, 'u_time');
   gl.uniform2f(uRes, canvas.width, canvas.height);
+
+  //overall setup of shape vectors
+
+  const chars = ' \'`1234567890-=~!@#$%^&*()_+[]\\{}|:";,./<>?qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM';
+  console.log(chars)
+  //dimensions of cell
+  const dimW = 10;
+  const dimH = 13;
+
+  const rects = [
+    {x: 0, y: 0, w: dimW / 2, h: dimH / 2},
+    {x: dimW / 2, y: 0, w: dimW / 2, h: dimH / 2},
+    {x: 0, y: dimH / 2, w: dimW / 2, h: dimH / 2},
+    {x: dimW / 2, y: dimH / 2, w: dimW / 2, h: dimH / 2},
+  ];
+
+  const shapeVectors = {};
+  for (char in chars){
+    shapeVectors[char] = preAscii(char, dimW, dimH, rects)
+  }
+  console.log(shapeVectors);
 
   function render(t) {
     gl.uniform1f(uTime, t * 0.001);
