@@ -34,11 +34,53 @@ function createShader(gl, type, source){
 
 /////////////////////////////////////////////////////
 // Shape
-function preAscii(char, dimW, dimH, circles) {
+function preAscii(char, dimW, dimH, rects) {
   const offscreen = document.createElement('canvas');
-  //offscreen.width = 
-}
+  offscreen.width = dimW;
+  offscreen.height = dimH;
+  // https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D
+  // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Pixel_manipulation_with_canvas
+  const ctx = offscreen.getContext('2d');
+  ctx.fillStyle = "black";
+  ctx.fillRect(0, 0, dimW, dimH);
+  ctx.fillStyle = "white";
+  ctx.font = `${dimH}px monospace`;
+  ctx.textBaseline = "top";
+  ctx.fillText(char, 0, 0);
+  
+  const pixel = ctx.getImageData(0, 0, dimW, dimH);
+  const data = pixel.data;
 
+  return rects.map(({ x, y, w, h }) => {
+    let lightPix = 0;
+    let total = 0;
+    for(let pixelY = y; pixelY < y + h; pixelY++){
+      for(let pixelX = x; pixelX < x + w; pixelX++){
+        const i = (Math.floor(pixelY) * dimW + Math.floor(pixelX)) * 4;
+        lightPix += data[i] / 255; //normalization
+        total += 1
+      };
+    };
+    return lightPix / total;
+  });
+};
+
+/////////////////////////////////////////////////////
+// Shape
+function sampleImage(data, dimW, dimH, rects, imgW, cellX, cellY) {
+  return rects.map(({ x, y, w, h }) => {
+    let lightPix = 0;
+    let total = 0;
+    for(let pixelY = cellY + y; pixelY < cellY + y + h; pixelY++){
+      for(let pixelX = cellX + x; pixelX < cellX + x + w; pixelX++){
+        const i = (Math.floor(pixelY) * imgW + Math.floor(pixelX)) * 4;
+        lightPix += data[i] / 255; //normalization
+        total += 1
+      };
+    };
+    return lightPix / total;
+  });
+};
 
 /////////////////////////////////////////////////////
 // Initialization and Rendering
@@ -94,10 +136,34 @@ function initialize(){
   ];
 
   const shapeVectors = {};
-  for (char in chars){
+  for (const char of chars){
     shapeVectors[char] = preAscii(char, dimW, dimH, rects)
   }
   console.log(shapeVectors);
+
+  const img = new Image();
+  img.src = "download.jpg";
+  img.onload = function() {
+    const imgCanvas = document.createElement('canvas');
+    imgCanvas.width = img.naturalWidth;
+    imgCanvas.height = img.naturalHeight;
+    const ctx = imgCanvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data;
+    const imgY = Math.floor(img.naturalHeight / dimH);
+    const imgX = Math.floor(img.naturalWidth / dimW);
+    for (let r = 0; r < imgY; r++){
+      for (let c = 0; c < imgX; c++) {
+        const cellX = c * dimW;
+        const cellY = r * dimH;
+        const samplingVector = sampleImage(data, dimW, dimH, rects, img.naturalWidth, cellX, cellY);
+        let smallest = Infinity
+        for (vectors of shapeVectors){
+          smallest = Math.min(smallest, Math.pow(vectors[0] - samplingVector, 2) + Math.pow(vectors[1] - samplingVector, 2));
+        }
+      };
+    };
+  };
 
   function render(t) {
     gl.uniform1f(uTime, t * 0.001);
