@@ -74,8 +74,12 @@ function sampleImage(data, dimW, dimH, rects, imgW, cellX, cellY) {
     for(let pixelY = cellY + y; pixelY < cellY + y + h; pixelY++){
       for(let pixelX = cellX + x; pixelX < cellX + x + w; pixelX++){
         const i = (Math.floor(pixelY) * imgW + Math.floor(pixelX)) * 4;
-        lightPix += data[i] / 255; //normalization
-        total += 1
+        const r = data[i] / 255; //normalization
+        const g = data[i + 1] / 255;
+        const b = data[i + 2] / 255;
+        // https://en.wikipedia.org/wiki/Relative_luminance
+        lightPix += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        total += 1;
       };
     };
     return lightPix / total;
@@ -142,14 +146,16 @@ function initialize(){
   console.log(shapeVectors);
 
   const img = new Image();
-  img.src = "download.jpg";
+  img.src = "it'sanimage you want to put";
   img.onload = function() {
+
     const imgCanvas = document.createElement('canvas');
     imgCanvas.width = img.naturalWidth;
     imgCanvas.height = img.naturalHeight;
     const ctx = imgCanvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
-    const data = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data;
+    const imgData = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
+    const data = imgData.data;
     const imgY = Math.floor(img.naturalHeight / dimH);
     const imgX = Math.floor(img.naturalWidth / dimW);
     const renderGrid = [];
