@@ -152,17 +152,38 @@ function initialize(){
     const data = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight).data;
     const imgY = Math.floor(img.naturalHeight / dimH);
     const imgX = Math.floor(img.naturalWidth / dimW);
+    const renderGrid = [];
     for (let r = 0; r < imgY; r++){
+      renderGrid.push([]);
       for (let c = 0; c < imgX; c++) {
         const cellX = c * dimW;
         const cellY = r * dimH;
         const samplingVector = sampleImage(data, dimW, dimH, rects, img.naturalWidth, cellX, cellY);
         let smallest = Infinity
-        for (vectors of shapeVectors){
-          smallest = Math.min(smallest, Math.pow(vectors[0] - samplingVector, 2) + Math.pow(vectors[1] - samplingVector, 2));
-        }
+        let bestChar = '';
+        for (const [char, shapeVector] of Object.entries(shapeVectors)) {
+          let dist = 0;
+          for (let i = 0; i < samplingVector.length; i++) {
+            dist += Math.pow(shapeVector[i] - samplingVector[i], 2);
+          };
+          if (dist < smallest) {
+            smallest = dist;
+            bestChar = char;
+          };
+        };
+        renderGrid[r][c] = bestChar;
       };
     };
+
+    const pre = document.querySelector('pre');
+    let rowString = "";
+    for (let r = 0; r < renderGrid.length; r++){
+      for (let c = 0; c < renderGrid[0].length; c++){
+        rowString += renderGrid[r][c];
+      }
+      rowString += "\n";
+    }
+    pre.textContent = rowString;
   };
 
   function render(t) {
