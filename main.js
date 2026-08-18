@@ -1,3 +1,6 @@
+// Project: Ascii Shader
+// Author: Jonathan Kang
+
 import vertexShaderSrc from './vertex.glsl.js';
 import fragmentShaderSrc from './fragment.glsl.js';
 
@@ -33,9 +36,11 @@ function createShader(gl, type, source){
 };
 
 /////////////////////////////////////////////////////
-// Shape
+// Pre-fills in 4 component vector of each particular ASCII character
+// Basically: The basic vector created here is 4 quadrants of a square,
+// And each quadrant finds the average "brightness/lightness" of a character
 function preAscii(char, dimW, dimH, rects) {
-  const offscreen = document.createElement('canvas');
+  const offscreen = document.createElement('canvas'); //invisible element
   offscreen.width = dimW;
   offscreen.height = dimH;
   // https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D
@@ -48,15 +53,18 @@ function preAscii(char, dimW, dimH, rects) {
   ctx.textBaseline = "top";
   ctx.fillText(char, 0, 0);
   
+  //reads pixel data from canvas
   const pixel = ctx.getImageData(0, 0, dimW, dimH);
   const data = pixel.data;
 
+  // returns 4-component vector of each ASCII character
   return rects.map(({ x, y, w, h }) => {
     let lightPix = 0;
     let total = 0;
     for(let pixelY = y; pixelY < y + h; pixelY++){
       for(let pixelX = x; pixelX < x + w; pixelX++){
         const i = (Math.floor(pixelY) * dimW + Math.floor(pixelX)) * 4;
+        //basing lightPixel on red channel, R = G = B in this instance (White = (255,255,255))
         lightPix += data[i] / 255; //normalization
         total += 1
       };
@@ -66,7 +74,8 @@ function preAscii(char, dimW, dimH, rects) {
 };
 
 /////////////////////////////////////////////////////
-// Shape
+// Returns 4-component vector of the cell/pixel data
+// Similar to preAscii's return function, except it's all based on all colors, not just red
 function sampleImage(data, dimW, dimH, rects, imgW, cellX, cellY) {
   return rects.map(({ x, y, w, h }) => {
     let lightPix = 0;
@@ -125,20 +134,20 @@ function initialize(){
   gl.uniform2f(uRes, canvas.width, canvas.height);
 
   //overall setup of shape vectors
-
   const chars = ' \'`1234567890-=~!@#$%^&*()_+[]\\{}|:";,./<>?qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM';
-  console.log(chars)
   //dimensions of cell
   const dimW = 10;
   const dimH = 13;
 
+  //2x2 cells that define density of a letter
   const rects = [
-    {x: 0, y: 0, w: dimW / 2, h: dimH / 2},
-    {x: dimW / 2, y: 0, w: dimW / 2, h: dimH / 2},
-    {x: 0, y: dimH / 2, w: dimW / 2, h: dimH / 2},
-    {x: dimW / 2, y: dimH / 2, w: dimW / 2, h: dimH / 2},
+    {x: 0,          y: 0,          w: dimW / 2,   h: dimH / 2},
+    {x: dimW / 2,   y: 0,          w: dimW / 2,   h: dimH / 2},
+    {x: 0,          y: dimH / 2,   w: dimW / 2,   h: dimH / 2},
+    {x: dimW / 2,   y: dimH / 2,   w: dimW / 2,   h: dimH / 2},
   ];
 
+  //fits the density of a letter into a 4-part vector
   const shapeVectors = {};
   for (const char of chars){
     shapeVectors[char] = preAscii(char, dimW, dimH, rects)
@@ -146,29 +155,45 @@ function initialize(){
   console.log(shapeVectors);
 
   const img = new Image();
-  img.src = "it'sanimage you want to put";
+  img.src = "faust.webp"; //currently hardcoded image to work with the ascii
+
+  //////////////////////////////////////////////////////////////////////////
+  //runs function when the image is fully loaded
+  //deals with drawing image onto the canvas
   img.onload = function() {
 
+    //creates pixel data from the img
     const imgCanvas = document.createElement('canvas');
     imgCanvas.width = img.naturalWidth;
     imgCanvas.height = img.naturalHeight;
     const ctx = imgCanvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
+
+    // extracts data (the RGBA array) into the data of each pixel
     const imgData = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
     const data = imgData.data;
+
+    // checks for cell row and column count that applies to image
     const imgY = Math.floor(img.naturalHeight / dimH);
     const imgX = Math.floor(img.naturalWidth / dimW);
+
+    //renderGrid is a 2D array of characters imitating the visualization of ASCII characters
+    //later converst into the "pre" element but first collects the closest characters
     const renderGrid = [];
     for (let r = 0; r < imgY; r++){
       renderGrid.push([]);
       for (let c = 0; c < imgX; c++) {
         const cellX = c * dimW;
         const cellY = r * dimH;
+
+        //samplingVector takes the 4 components of the pixel data/cell for later comparison with a char's shapeVector
         const samplingVector = sampleImage(data, dimW, dimH, rects, img.naturalWidth, cellX, cellY);
         let smallest = Infinity
         let bestChar = '';
+        //checks the closest neighbor character that applies to the particular cell
         for (const [char, shapeVector] of Object.entries(shapeVectors)) {
           let dist = 0;
+          // checks each of the 4 components to see what's the closest neighbor
           for (let i = 0; i < samplingVector.length; i++) {
             dist += Math.pow(shapeVector[i] - samplingVector[i], 2);
           };
@@ -177,10 +202,12 @@ function initialize(){
             bestChar = char;
           };
         };
+        // best fit character for the cell
         renderGrid[r][c] = bestChar;
       };
     };
 
+    // pastes all data onto the pre element (which is visible on the website)
     const pre = document.querySelector('pre');
     let rowString = "";
     for (let r = 0; r < renderGrid.length; r++){
@@ -192,6 +219,7 @@ function initialize(){
     pre.textContent = rowString;
   };
 
+  //to render everything frame by frame
   function render(t) {
     gl.uniform1f(uTime, t * 0.001);
     gl.clear(gl.COLOR_BUFFER_BIT);
