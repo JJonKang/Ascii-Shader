@@ -3,6 +3,7 @@
 
 import vertexShaderSrc from './vertex.glsl.js';
 import fragmentShaderSrc from './fragment.glsl.js';
+import { IMAGE_SRC, DIM_H, DIM_W } from './config.js';
 
 const resizing = 3.0;
 
@@ -18,7 +19,6 @@ function createProgram(gl, vshader, fshader){
     let info = gl.getProgramInfoLog(program);
     console.log('Could not compile WebGL program:' + info);
   }
-
   return program;
 };
 
@@ -39,22 +39,22 @@ function createShader(gl, type, source){
 // Pre-fills in 4 component vector of each particular ASCII character
 // Basically: The basic vector created here is 4 quadrants of a square,
 // And each quadrant finds the average "brightness/lightness" of a character
-function preAscii(char, dimW, dimH, rects) {
+function preAscii(char, rects) {
   const offscreen = document.createElement('canvas'); //invisible element
-  offscreen.width = dimW;
-  offscreen.height = dimH;
+  offscreen.width = DIM_W;
+  offscreen.height = DIM_H;
   // https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D
   // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Pixel_manipulation_with_canvas
   const ctx = offscreen.getContext('2d');
   ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, dimW, dimH);
+  ctx.fillRect(0, 0, DIM_W, DIM_H);
   ctx.fillStyle = "white";
-  ctx.font = `${dimH}px monospace`;
+  ctx.font = `${DIM_H}px monospace`;
   ctx.textBaseline = "top";
   ctx.fillText(char, 0, 0);
   
   //reads pixel data from canvas
-  const pixel = ctx.getImageData(0, 0, dimW, dimH);
+  const pixel = ctx.getImageData(0, 0, DIM_W, DIM_H);
   const data = pixel.data;
 
   // returns 4-component vector of each ASCII character
@@ -63,7 +63,7 @@ function preAscii(char, dimW, dimH, rects) {
     let total = 0;
     for(let pixelY = y; pixelY < y + h; pixelY++){
       for(let pixelX = x; pixelX < x + w; pixelX++){
-        const i = (Math.floor(pixelY) * dimW + Math.floor(pixelX)) * 4;
+        const i = (Math.floor(pixelY) * DIM_W + Math.floor(pixelX)) * 4;
         //basing lightPixel on red channel, R = G = B in this instance (White = (255,255,255))
         lightPix += data[i] / 255; //normalization
         total += 1
@@ -76,7 +76,7 @@ function preAscii(char, dimW, dimH, rects) {
 /////////////////////////////////////////////////////
 // Returns 4-component vector of the cell/pixel data
 // Similar to preAscii's return function, except it's all based on all colors, not just red
-function sampleImage(data, dimW, dimH, rects, imgW, cellX, cellY) {
+function sampleImage(data, rects, imgW, cellX, cellY) {
   return rects.map(({ x, y, w, h }) => {
     let lightPix = 0;
     let total = 0;
@@ -133,29 +133,26 @@ function initialize(){
   const uTime = gl.getUniformLocation(program, 'u_time');
   gl.uniform2f(uRes, canvas.width, canvas.height);
 
-  //overall setup of shape vectors
+  //setup of shape vectors
   const chars = ' \'`1234567890-=~!@#$%^&*()_+[]\\{}|:";,./<>?qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM';
-  //dimensions of cell
-  const dimW = 10;
-  const dimH = 13;
 
   //2x2 cells that define density of a letter
   const rects = [
-    {x: 0,          y: 0,          w: dimW / 2,   h: dimH / 2},
-    {x: dimW / 2,   y: 0,          w: dimW / 2,   h: dimH / 2},
-    {x: 0,          y: dimH / 2,   w: dimW / 2,   h: dimH / 2},
-    {x: dimW / 2,   y: dimH / 2,   w: dimW / 2,   h: dimH / 2},
+    {x: 0,          y: 0,          w: DIM_W / 2,   h: DIM_H / 2},
+    {x: DIM_W / 2,   y: 0,          w: DIM_W / 2,   h: DIM_H / 2},
+    {x: 0,          y: DIM_H / 2,   w: DIM_W / 2,   h: DIM_H / 2},
+    {x: DIM_W / 2,   y: DIM_H / 2,   w: DIM_W / 2,   h: DIM_H / 2},
   ];
 
   //fits the density of a letter into a 4-part vector
   const shapeVectors = {};
   for (const char of chars){
-    shapeVectors[char] = preAscii(char, dimW, dimH, rects)
+    shapeVectors[char] = preAscii(char, rects)
   }
   console.log(shapeVectors);
 
   const img = new Image();
-  img.src = "faust.webp"; //currently hardcoded image to work with the ascii
+  img.src = IMAGE_SRC; //currently hardcoded image to work with the ascii
 
   //////////////////////////////////////////////////////////////////////////
   //runs function when the image is fully loaded
@@ -174,8 +171,8 @@ function initialize(){
     const data = imgData.data;
 
     // checks for cell row and column count that applies to image
-    const imgY = Math.floor(img.naturalHeight / dimH);
-    const imgX = Math.floor(img.naturalWidth / dimW);
+    const imgY = Math.floor(img.naturalHeight / DIM_H);
+    const imgX = Math.floor(img.naturalWidth / DIM_W);
 
     //renderGrid is a 2D array of characters imitating the visualization of ASCII characters
     //later converst into the "pre" element but first collects the closest characters
@@ -183,11 +180,11 @@ function initialize(){
     for (let r = 0; r < imgY; r++){
       renderGrid.push([]);
       for (let c = 0; c < imgX; c++) {
-        const cellX = c * dimW;
-        const cellY = r * dimH;
+        const cellX = c * DIM_W;
+        const cellY = r * DIM_H;
 
         //samplingVector takes the 4 components of the pixel data/cell for later comparison with a char's shapeVector
-        const samplingVector = sampleImage(data, dimW, dimH, rects, img.naturalWidth, cellX, cellY);
+        const samplingVector = sampleImage(data, rects, img.naturalWidth, cellX, cellY);
         let smallest = Infinity
         let bestChar = '';
         //checks the closest neighbor character that applies to the particular cell
