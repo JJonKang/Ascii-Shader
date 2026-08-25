@@ -74,7 +74,7 @@ function preAscii(char, rects) {
 };
 
 /////////////////////////////////////////////////////
-// Returns 4-component vector of the cell/pixel data
+// Returns 4-component vector of the cell/pixel data with rects.map
 // Similar to preAscii's return function, except it's all based on all colors, not just red
 function sampleImage(data, rects, imgW, cellX, cellY) {
   return rects.map(({ x, y, w, h }) => {
@@ -104,6 +104,9 @@ function initialize(){
   canvas.height = canvas.clientHeight * resizing;
   const gl = canvas.getContext('webgl2');
   gl.viewport(0, 0, canvas.width, canvas.height);
+
+  //texture setup
+  let source = null;
 
   //create shaders
   const vshader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSrc);
@@ -144,15 +147,30 @@ function initialize(){
     {x: DIM_W / 2,   y: DIM_H / 2,   w: DIM_W / 2,   h: DIM_H / 2},
   ];
 
-  //fits the density of a letter into a 4-part vector
-  const shapeVectors = {};
+  //fits the density of a letter into a 4-part vector with a Float32Array
+  const shapeVectors = new Float32Array(chars.length * 4);
   for (const char of chars){
-    shapeVectors[char] = preAscii(char, rects)
+    const loc = chars.indexOf(char)
+    const shape = preAscii(char, rects);
+    let quadrant = 0
+    while(quadrant < 4){
+      shapeVectors[(loc * 4) + quadrant] = shape[quadrant];
+      quadrant += 1
+    }
   }
   console.log(shapeVectors);
+  // https://webgl2fundamentals.org/webgl/lessons/webgl-data-textures.html
+  const textureShapeVector = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, textureShapeVector);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, chars.length, 1, 0, gl.RGBA, gl.FLOAT, shapeVectors);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   const img = new Image();
-  img.src = IMAGE_SRC; //currently hardcoded image to work with the ascii
+  img.src = IMAGE_SRC;
 
   //////////////////////////////////////////////////////////////////////////
   //runs function when the image is fully loaded
@@ -188,11 +206,13 @@ function initialize(){
         let smallest = Infinity
         let bestChar = '';
         //checks the closest neighbor character that applies to the particular cell
-        for (const [char, shapeVector] of Object.entries(shapeVectors)) {
+        for (let i = 0; i < chars.length; i++) {
+          let char = chars[i]
+          let offset = i * 4;
           let dist = 0;
           // checks each of the 4 components to see what's the closest neighbor
-          for (let i = 0; i < samplingVector.length; i++) {
-            dist += Math.pow(shapeVector[i] - samplingVector[i], 2);
+          for (let j = 0; j < 4; j++) {
+            dist += Math.pow(shapeVectors[offset + j] - samplingVector[j], 2);
           };
           if (dist < smallest) {
             smallest = dist;
@@ -214,10 +234,27 @@ function initialize(){
       rowString += "\n";
     }
     pre.textContent = rowString;
-  };
 
+    //image/video setup
+    source = img;
+    const texture = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+  };
   //to render everything frame by frame
   function render(t) {
+    // https://dev.to/learosema/realtime-video-processing-with-webgl-5653
+    if(source){
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    }
+    gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
+    gl.uniform1i(gl.getUniformLocation(program, 'u_shapeVector'), 1);
     gl.uniform1f(uTime, t * 0.001);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
