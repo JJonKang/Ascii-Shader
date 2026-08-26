@@ -256,6 +256,13 @@ function initialize(){
     gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
     gl.uniform1i(gl.getUniformLocation(program, 'u_shapeVector'), 1);
     gl.uniform1f(uTime, t * 0.001);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_dimW'), DIM_W);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_dimH'), DIM_H);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_rects'), rects);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_chars'), chars);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), img.naturalWidth);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), img.naturalHeight);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_charsLength'), chars.length);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     requestAnimationFrame(render);
