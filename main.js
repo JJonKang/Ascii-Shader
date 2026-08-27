@@ -103,6 +103,11 @@ function initialize(){
   canvas.width = canvas.clientWidth * resizing;
   canvas.height = canvas.clientHeight * resizing;
   const gl = canvas.getContext('webgl2');
+  // https://developer.mozilla.org/en-US/docs/Web/API/EXT_color_buffer_float
+  const ext = gl.getExtension('EXT_color_buffer_float');
+  if (!ext) {
+    console.warn('EXT_color_buffer_float not supported on this device');
+  }
   gl.viewport(0, 0, canvas.width, canvas.height);
 
   //texture setup
@@ -136,8 +141,30 @@ function initialize(){
   const uTime = gl.getUniformLocation(program, 'u_time');
   gl.uniform2f(uRes, canvas.width, canvas.height);
 
-  //setup of shape vectors
+  //setup of shape vectors and the font atlas texture creation
   const chars = ' \'`1234567890-=~!@#$%^&*()_+[]\\{}|:";,./<>?qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM';
+  const atlasCanvas = document.createElement('canvas');
+  atlasCanvas.width = DIM_W * chars.length;
+  atlasCanvas.height = DIM_H;
+  const ctxAtlas = atlasCanvas.getContext('2d');
+  ctxAtlas.fillStyle = 'black';
+  ctxAtlas.fillRect(0, 0, atlasCanvas.width, atlasCanvas.height);
+  ctxAtlas.fillStyle = 'white';
+  ctxAtlas.font = `${DIM_H}px monospace`;
+  ctxAtlas.textBaseline = 'top';
+  for (let i = 0; i < chars.length; i++){
+    ctxAtlas.fillText(chars[i], i * DIM_W, 0);
+  };
+
+  // font texture atlas setup
+  const textureText = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE2);
+  gl.bindTexture(gl.TEXTURE_2D, textureText);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlasCanvas);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   //2x2 cells that define density of a letter
   const rects = [
@@ -176,11 +203,14 @@ function initialize(){
   //runs function when the image is fully loaded
   //deals with drawing image onto the canvas
   img.onload = function() {
-
+    canvas.style.width = img.naturalWidth + 'px';
+    canvas.style.height = img.naturalHeight + 'px';
     //creates pixel data from the img
     const imgCanvas = document.createElement('canvas');
-    imgCanvas.width = img.naturalWidth;
-    imgCanvas.height = img.naturalHeight;
+    imgCanvas.width = img.naturalWidth * resizing;
+    imgCanvas.height = img.naturalHeight * resizing;
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.uniform2f(uRes, canvas.width, canvas.height);
     const ctx = imgCanvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
 
@@ -194,46 +224,46 @@ function initialize(){
 
     //renderGrid is a 2D array of characters imitating the visualization of ASCII characters
     //later converst into the "pre" element but first collects the closest characters
-    const renderGrid = [];
-    for (let r = 0; r < imgY; r++){
-      renderGrid.push([]);
-      for (let c = 0; c < imgX; c++) {
-        const cellX = c * DIM_W;
-        const cellY = r * DIM_H;
+    // const renderGrid = [];
+    // for (let r = 0; r < imgY; r++){
+    //   renderGrid.push([]);
+    //   for (let c = 0; c < imgX; c++) {
+    //     const cellX = c * DIM_W;
+    //     const cellY = r * DIM_H;
 
-        //samplingVector takes the 4 components of the pixel data/cell for later comparison with a char's shapeVector
-        const samplingVector = sampleImage(data, rects, img.naturalWidth, cellX, cellY);
-        let smallest = Infinity
-        let bestChar = '';
-        //checks the closest neighbor character that applies to the particular cell
-        for (let i = 0; i < chars.length; i++) {
-          let char = chars[i]
-          let offset = i * 4;
-          let dist = 0;
-          // checks each of the 4 components to see what's the closest neighbor
-          for (let j = 0; j < 4; j++) {
-            dist += Math.pow(shapeVectors[offset + j] - samplingVector[j], 2);
-          };
-          if (dist < smallest) {
-            smallest = dist;
-            bestChar = char;
-          };
-        };
-        // best fit character for the cell
-        renderGrid[r][c] = bestChar;
-      };
-    };
+    //     //samplingVector takes the 4 components of the pixel data/cell for later comparison with a char's shapeVector
+    //     const samplingVector = sampleImage(data, rects, img.naturalWidth, cellX, cellY);
+    //     let smallest = Infinity
+    //     let bestChar = '';
+    //     //checks the closest neighbor character that applies to the particular cell
+    //     for (let i = 0; i < chars.length; i++) {
+    //       let char = chars[i]
+    //       let offset = i * 4;
+    //       let dist = 0;
+    //       // checks each of the 4 components to see what's the closest neighbor
+    //       for (let j = 0; j < 4; j++) {
+    //         dist += Math.pow(shapeVectors[offset + j] - samplingVector[j], 2);
+    //       };
+    //       if (dist < smallest) {
+    //         smallest = dist;
+    //         bestChar = char;
+    //       };
+    //     };
+    //     // best fit character for the cell
+    //     renderGrid[r][c] = bestChar;
+    //   };
+    // };
 
     // pastes all data onto the pre element (which is visible on the website)
-    const pre = document.querySelector('pre');
-    let rowString = "";
-    for (let r = 0; r < renderGrid.length; r++){
-      for (let c = 0; c < renderGrid[0].length; c++){
-        rowString += renderGrid[r][c];
-      }
-      rowString += "\n";
-    }
-    pre.textContent = rowString;
+    // const pre = document.querySelector('pre');
+    // let rowString = "";
+    // for (let r = 0; r < renderGrid.length; r++){
+    //   for (let c = 0; c < renderGrid[0].length; c++){
+    //     rowString += renderGrid[r][c];
+    //   }
+    //   rowString += "\n";
+    // }
+    // pre.textContent = rowString;
 
     //image/video setup
     source = img;
@@ -246,6 +276,9 @@ function initialize(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
+
+    gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), img.naturalWidth);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), img.naturalHeight);
   };
   //to render everything frame by frame
   function render(t) {
@@ -253,20 +286,19 @@ function initialize(){
     if(source){
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);
     }
-    gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
-    gl.uniform1i(gl.getUniformLocation(program, 'u_shapeVector'), 1);
     gl.uniform1f(uTime, t * 0.001);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_dimW'), DIM_W);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_dimH'), DIM_H);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_rects'), rects);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_chars'), chars);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), img.naturalWidth);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), img.naturalHeight);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_charsLength'), chars.length);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     requestAnimationFrame(render);
   };
+
+  gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
+  gl.uniform1i(gl.getUniformLocation(program, 'u_shapeVector'), 1);
+  gl.uniform1i(gl.getUniformLocation(program, 'u_atlas'), 2);
+  gl.uniform1i(gl.getUniformLocation(program, 'u_charsLength'), chars.length);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_dimW'), DIM_W);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_dimH'), DIM_H);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_resizing'), resizing);
 
   requestAnimationFrame(render);
 };
