@@ -227,77 +227,16 @@ function initialize(){
       gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), video.videoHeight);
     };
   } else {
-
     //////////////////////////////////////////////////////////////////////////
     //runs function when the image is fully loaded
     //deals with drawing image onto the canvas
-    
     const img = new Image();
     img.src = IMAGE_SRC;
     img.onload = function() {
-      canvas.width = canvas.clientWidth * resizing;
-      canvas.height = canvas.clientHeight * resizing;
       canvas.style.width = img.naturalWidth + 'px';
       canvas.style.height = img.naturalHeight + 'px';
-      //creates pixel data from the img
-      const imgCanvas = document.createElement('canvas');
-      imgCanvas.width = img.naturalWidth * resizing;
-      imgCanvas.height = img.naturalHeight * resizing;
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.uniform2f(uRes, canvas.width, canvas.height);
-      const ctx = imgCanvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-
-      // extracts data (the RGBA array) into the data of each pixel
-      const imgData = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
-      const data = imgData.data;
-
-      // checks for cell row and column count that applies to image
-      const imgY = Math.floor(img.naturalHeight / DIM_H);
-      const imgX = Math.floor(img.naturalWidth / DIM_W);
-
-      //renderGrid is a 2D array of characters imitating the visualization of ASCII characters
-      //later converst into the "pre" element but first collects the closest characters
-      // const renderGrid = [];
-      // for (let r = 0; r < imgY; r++){
-      //   renderGrid.push([]);
-      //   for (let c = 0; c < imgX; c++) {
-      //     const cellX = c * DIM_W;
-      //     const cellY = r * DIM_H;
-
-      //     //samplingVector takes the 4 components of the pixel data/cell for later comparison with a char's shapeVector
-      //     const samplingVector = sampleImage(data, rects, img.naturalWidth, cellX, cellY);
-      //     let smallest = Infinity
-      //     let bestChar = '';
-      //     //checks the closest neighbor character that applies to the particular cell
-      //     for (let i = 0; i < chars.length; i++) {
-      //       let char = chars[i]
-      //       let offset = i * 4;
-      //       let dist = 0;
-      //       // checks each of the 4 components to see what's the closest neighbor
-      //       for (let j = 0; j < 4; j++) {
-      //         dist += Math.pow(shapeVectors[offset + j] - samplingVector[j], 2);
-      //       };
-      //       if (dist < smallest) {
-      //         smallest = dist;
-      //         bestChar = char;
-      //       };
-      //     };
-      //     // best fit character for the cell
-      //     renderGrid[r][c] = bestChar;
-      //   };
-      // };
-
-      // pastes all data onto the pre element (which is visible on the website)
-      // const pre = document.querySelector('pre');
-      // let rowString = "";
-      // for (let r = 0; r < renderGrid.length; r++){
-      //   for (let c = 0; c < renderGrid[0].length; c++){
-      //     rowString += renderGrid[r][c];
-      //   }
-      //   rowString += "\n";
-      // }
-      // pre.textContent = rowString;
+      canvas.width = img.naturalWidth * resizing;
+      canvas.height = img.naturalHeight * resizing;
 
       //image setup
       source = img;
