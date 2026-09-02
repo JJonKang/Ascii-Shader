@@ -11,6 +11,8 @@ uniform float u_imageW;
 uniform float u_imageH;
 uniform float u_resizing;
 
+const float darkness = 0.5;
+
 uniform sampler2D u_texture; // the main source (eg. image)
 uniform sampler2D u_shapeVector; // converter (the vectors for all characters from u_chars)
 uniform int u_charsLength; //length of the chars available for ascii conversion
@@ -24,7 +26,7 @@ float sampleSource(vec2 quad, float cellX, float cellY) {
   vec2 uv = vec2(sampleX / (u_resolution.x / u_resizing), sampleY / (u_resolution.y / u_resizing));  
   vec4 colors = texture(u_texture, uv);
   // https://en.wikipedia.org/wiki/Relative_luminance
-  return 0.2126 * colors.r + 0.7152 * colors.g + 0.0722 * colors.b;
+  return (0.2126 * colors.r + 0.7152 * colors.g + 0.0722 * colors.b) * darkness;
 }
 
 void main() {

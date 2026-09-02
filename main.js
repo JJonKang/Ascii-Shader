@@ -1,5 +1,4 @@
 // Project: Ascii Shader
-// Author: Jonathan Kang
 
 import vertexShaderSrc from './vertex.glsl.js';
 import fragmentShaderSrc from './fragment.glsl.js';
@@ -196,89 +195,124 @@ function initialize(){
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-  const img = new Image();
-  img.src = IMAGE_SRC;
+  // differentiation between video and images
+  // mp4 webm and ogg are browser supported
+  const isVideo = IMAGE_SRC.match(/\.(mp4|webm|ogg)$/i);
 
-  //////////////////////////////////////////////////////////////////////////
-  //runs function when the image is fully loaded
-  //deals with drawing image onto the canvas
-  img.onload = function() {
-    canvas.style.width = img.naturalWidth + 'px';
-    canvas.style.height = img.naturalHeight + 'px';
-    //creates pixel data from the img
-    const imgCanvas = document.createElement('canvas');
-    imgCanvas.width = img.naturalWidth * resizing;
-    imgCanvas.height = img.naturalHeight * resizing;
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.uniform2f(uRes, canvas.width, canvas.height);
-    const ctx = imgCanvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
+  // video initial creation
+  if (isVideo) {
+    const video = document.createElement('video');
+    video.src = IMAGE_SRC;
+    video.loop = true;
+    video.muted = true;
+    // NOTE: future changes (interaction oriented)
+    // can include audio and video interaction
+    video.play();
+    video.onloadeddata = function() {
+      canvas.style.width = video.videoWidth + 'px';
+      canvas.style.height = video.videoHeight + 'px';
 
-    // extracts data (the RGBA array) into the data of each pixel
-    const imgData = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
-    const data = imgData.data;
+      // video setup
+      source = video;
+      const texture = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-    // checks for cell row and column count that applies to image
-    const imgY = Math.floor(img.naturalHeight / DIM_H);
-    const imgX = Math.floor(img.naturalWidth / DIM_W);
+      gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), video.videoWidth);
+      gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), video.videoHeight);
+    };
+  } else {
 
-    //renderGrid is a 2D array of characters imitating the visualization of ASCII characters
-    //later converst into the "pre" element but first collects the closest characters
-    // const renderGrid = [];
-    // for (let r = 0; r < imgY; r++){
-    //   renderGrid.push([]);
-    //   for (let c = 0; c < imgX; c++) {
-    //     const cellX = c * DIM_W;
-    //     const cellY = r * DIM_H;
+    //////////////////////////////////////////////////////////////////////////
+    //runs function when the image is fully loaded
+    //deals with drawing image onto the canvas
+    
+    const img = new Image();
+    img.src = IMAGE_SRC;
+    img.onload = function() {
+      canvas.width = canvas.clientWidth * resizing;
+      canvas.height = canvas.clientHeight * resizing;
+      canvas.style.width = img.naturalWidth + 'px';
+      canvas.style.height = img.naturalHeight + 'px';
+      //creates pixel data from the img
+      const imgCanvas = document.createElement('canvas');
+      imgCanvas.width = img.naturalWidth * resizing;
+      imgCanvas.height = img.naturalHeight * resizing;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.uniform2f(uRes, canvas.width, canvas.height);
+      const ctx = imgCanvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
 
-    //     //samplingVector takes the 4 components of the pixel data/cell for later comparison with a char's shapeVector
-    //     const samplingVector = sampleImage(data, rects, img.naturalWidth, cellX, cellY);
-    //     let smallest = Infinity
-    //     let bestChar = '';
-    //     //checks the closest neighbor character that applies to the particular cell
-    //     for (let i = 0; i < chars.length; i++) {
-    //       let char = chars[i]
-    //       let offset = i * 4;
-    //       let dist = 0;
-    //       // checks each of the 4 components to see what's the closest neighbor
-    //       for (let j = 0; j < 4; j++) {
-    //         dist += Math.pow(shapeVectors[offset + j] - samplingVector[j], 2);
-    //       };
-    //       if (dist < smallest) {
-    //         smallest = dist;
-    //         bestChar = char;
-    //       };
-    //     };
-    //     // best fit character for the cell
-    //     renderGrid[r][c] = bestChar;
-    //   };
-    // };
+      // extracts data (the RGBA array) into the data of each pixel
+      const imgData = ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight);
+      const data = imgData.data;
 
-    // pastes all data onto the pre element (which is visible on the website)
-    // const pre = document.querySelector('pre');
-    // let rowString = "";
-    // for (let r = 0; r < renderGrid.length; r++){
-    //   for (let c = 0; c < renderGrid[0].length; c++){
-    //     rowString += renderGrid[r][c];
-    //   }
-    //   rowString += "\n";
-    // }
-    // pre.textContent = rowString;
+      // checks for cell row and column count that applies to image
+      const imgY = Math.floor(img.naturalHeight / DIM_H);
+      const imgX = Math.floor(img.naturalWidth / DIM_W);
 
-    //image/video setup
-    source = img;
-    const texture = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      //renderGrid is a 2D array of characters imitating the visualization of ASCII characters
+      //later converst into the "pre" element but first collects the closest characters
+      // const renderGrid = [];
+      // for (let r = 0; r < imgY; r++){
+      //   renderGrid.push([]);
+      //   for (let c = 0; c < imgX; c++) {
+      //     const cellX = c * DIM_W;
+      //     const cellY = r * DIM_H;
 
+      //     //samplingVector takes the 4 components of the pixel data/cell for later comparison with a char's shapeVector
+      //     const samplingVector = sampleImage(data, rects, img.naturalWidth, cellX, cellY);
+      //     let smallest = Infinity
+      //     let bestChar = '';
+      //     //checks the closest neighbor character that applies to the particular cell
+      //     for (let i = 0; i < chars.length; i++) {
+      //       let char = chars[i]
+      //       let offset = i * 4;
+      //       let dist = 0;
+      //       // checks each of the 4 components to see what's the closest neighbor
+      //       for (let j = 0; j < 4; j++) {
+      //         dist += Math.pow(shapeVectors[offset + j] - samplingVector[j], 2);
+      //       };
+      //       if (dist < smallest) {
+      //         smallest = dist;
+      //         bestChar = char;
+      //       };
+      //     };
+      //     // best fit character for the cell
+      //     renderGrid[r][c] = bestChar;
+      //   };
+      // };
 
-    gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), img.naturalWidth);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), img.naturalHeight);
+      // pastes all data onto the pre element (which is visible on the website)
+      // const pre = document.querySelector('pre');
+      // let rowString = "";
+      // for (let r = 0; r < renderGrid.length; r++){
+      //   for (let c = 0; c < renderGrid[0].length; c++){
+      //     rowString += renderGrid[r][c];
+      //   }
+      //   rowString += "\n";
+      // }
+      // pre.textContent = rowString;
+
+      //image setup
+      source = img;
+      const texture = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+      gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), img.naturalWidth);
+      gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), img.naturalHeight);
+    };
   };
   //to render everything frame by frame
   function render(t) {
