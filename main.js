@@ -95,8 +95,72 @@ function sampleImage(data, rects, imgW, cellX, cellY) {
 };
 
 /////////////////////////////////////////////////////
+// video setup
+function videoSetup(canvas, gl, program){
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.src = IMAGE_SRC;
+    video.loop = true;
+    video.muted = true;
+    // NOTE: future changes (interaction oriented)
+    // can include audio and video interaction
+    video.play();
+    video.onloadeddata = function() {
+      canvas.style.width = video.videoWidth + 'px';
+      canvas.style.height = video.videoHeight + 'px';
+
+      // video setup
+      const texture = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+      gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), video.videoWidth);
+      gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), video.videoHeight);
+
+      resolve(video);
+    };
+  });
+}
+
+/////////////////////////////////////////////////////
+// image setup
+// runs function when the image is fully loaded
+function imageSetup(canvas, gl, program){
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = IMAGE_SRC;
+    img.onload = function() {
+      canvas.style.width = img.naturalWidth + 'px';
+      canvas.style.height = img.naturalHeight + 'px';
+      canvas.width = img.naturalWidth * resizing;
+      canvas.height = img.naturalHeight * resizing;
+
+      //image setup
+      const texture = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+      gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), img.naturalWidth);
+      gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), img.naturalHeight);
+      
+      resolve(img);
+    };
+  });
+};
+
+/////////////////////////////////////////////////////
 // Initialization and Rendering
-function initialize(){
+async function initialize(){
   // screen setup
   const canvas = document.querySelector('canvas');
   canvas.width = canvas.clientWidth * resizing;
@@ -108,9 +172,6 @@ function initialize(){
     console.warn('EXT_color_buffer_float not supported on this device');
   }
   gl.viewport(0, 0, canvas.width, canvas.height);
-
-  //texture setup
-  let source = null;
 
   //create shaders
   const vshader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSrc);
@@ -199,61 +260,15 @@ function initialize(){
   // mp4 webm and ogg are browser supported
   const isVideo = IMAGE_SRC.match(/\.(mp4|webm|ogg)$/i);
 
-  // video initial creation
+  // video/image initial creation
+  let source = null; //texture setup
   if (isVideo) {
-    const video = document.createElement('video');
-    video.src = IMAGE_SRC;
-    video.loop = true;
-    video.muted = true;
-    // NOTE: future changes (interaction oriented)
-    // can include audio and video interaction
-    video.play();
-    video.onloadeddata = function() {
-      canvas.style.width = video.videoWidth + 'px';
-      canvas.style.height = video.videoHeight + 'px';
-
-      // video setup
-      source = video;
-      const texture = gl.createTexture();
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-      gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), video.videoWidth);
-      gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), video.videoHeight);
-    };
+    source = await videoSetup(canvas, gl, program);
   } else {
-    //////////////////////////////////////////////////////////////////////////
-    //runs function when the image is fully loaded
-    //deals with drawing image onto the canvas
-    const img = new Image();
-    img.src = IMAGE_SRC;
-    img.onload = function() {
-      canvas.style.width = img.naturalWidth + 'px';
-      canvas.style.height = img.naturalHeight + 'px';
-      canvas.width = img.naturalWidth * resizing;
-      canvas.height = img.naturalHeight * resizing;
-
-      //image setup
-      source = img;
-      const texture = gl.createTexture();
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-      gl.uniform1f(gl.getUniformLocation(program, 'u_imageW'), img.naturalWidth);
-      gl.uniform1f(gl.getUniformLocation(program, 'u_imageH'), img.naturalHeight);
-    };
+    source = await imageSetup(canvas, gl, program);
   };
-  //to render everything frame by frame
+
+  // to render everything frame by frame
   function render(t) {
     // https://dev.to/learosema/realtime-video-processing-with-webgl-5653
     if(source){
